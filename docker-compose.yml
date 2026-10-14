@@ -1,0 +1,41 @@
+services:
+  rabbitmq:
+    image: rabbitmq:4-management
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: app
+      RABBITMQ_DEFAULT_PASS: app
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    environment:
+      PORT: 3000
+      RABBITMQ_URL: amqp://app:app@rabbitmq:5672
+      RABBITMQ_EXCHANGE: practice.events
+      RABBITMQ_QUEUE: practice.messages
+      RABBITMQ_ROUTING_KEY: message.created
+    ports:
+      - "3000:3000"
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  worker:
+    build: .
+    command: ["node", "dist/worker.js"]
+    environment:
+      RABBITMQ_URL: amqp://app:app@rabbitmq:5672
+      RABBITMQ_EXCHANGE: practice.events
+      RABBITMQ_QUEUE: practice.messages
+      RABBITMQ_ROUTING_KEY: message.created
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
